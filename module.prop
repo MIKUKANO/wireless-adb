@@ -1,6 +1,6 @@
 id=wireless-adb
-name=Wireless ADB
-version=v1.0
-versionCode=1
-author=dracediax
-description=Persistent wireless ADB debugging — auto-enables on boot
+name=无线 ADB · 稳定连接
+version=v2.0.0-rc1
+versionCode=19901
+author=dracediax, MIKUKANO
+description=中文 WebUI、手动启停、TCP/TLS 模式、通知栏管理入口；保留系统 ADB 授权

@@ -1,0 +1,13 @@
+{
+  "name": "wireless-adb-module",
+  "version": "2.0.0-rc1",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test tests/model.test.mjs",
+    "test:ui": "node tests/ui.test.mjs",
+    "build": "python tools/build.py"
+  },
+  "devDependencies": { "playwright": "1.65.0" }
+}
