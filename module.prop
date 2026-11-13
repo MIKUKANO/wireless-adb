@@ -1,6 +1,6 @@
 id=wireless-adb
-name=无线 ADB · 稳定连接
-version=v2.0.0-rc1
-versionCode=19901
-author=dracediax, MIKUKANO
-description=中文 WebUI、手动启停、TCP/TLS 模式、通知栏管理入口；保留系统 ADB 授权
+name=无线 ADB
+version=v1.0
+versionCode=1
+author=dracediax
+description=持久无线 ADB 调试 — 开机自动启用

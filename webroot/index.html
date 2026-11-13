@@ -1,54 +1,362 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'; img-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
-<meta name="color-scheme" content="light dark">
-<title>无线 ADB · 稳定连接</title>
-<link rel="stylesheet" href="styles.css">
-<script type="module" src="app.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无线 ADB</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, system-ui, sans-serif;
+    background: #1a1a2e; color: #e0e0e0;
+    padding: 16px; min-height: 100vh;
+  }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; color: #fff; }
+  .subtitle { font-size: 13px; color: #888; margin-bottom: 24px; }
+
+  .card {
+    background: #16213e; border-radius: 12px;
+    padding: 16px; margin-bottom: 12px;
+  }
+  .card h2 {
+    font-size: 14px; color: #8899bb; margin-bottom: 12px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+
+  .status-display {
+    text-align: center; padding: 20px 0;
+  }
+  .status-dot {
+    display: inline-block; width: 12px; height: 12px;
+    border-radius: 50%; margin-right: 8px; vertical-align: middle;
+  }
+  .status-dot.on { background: #3fb950; box-shadow: 0 0 8px #3fb95066; }
+  .status-dot.off { background: #666; }
+  .status-text {
+    font-size: 18px; font-weight: 600; color: #fff;
+  }
+  .connect-info {
+    margin-top: 12px; background: #0f1a30; border-radius: 8px;
+    padding: 14px; text-align: center; font-family: monospace;
+    font-size: 16px; color: #58a6ff; letter-spacing: 0.5px;
+    user-select: all; cursor: pointer;
+  }
+  .connect-hint {
+    font-size: 11px; color: #666; margin-top: 6px; text-align: center;
+    font-family: -apple-system, system-ui, sans-serif;
+  }
+
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 0;
+  }
+  .toggle-label { font-size: 15px; color: #ccc; }
+  .toggle { position: relative; width: 52px; height: 28px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle .slider {
+    position: absolute; inset: 0; background: #333;
+    border-radius: 28px; cursor: pointer; transition: 0.3s;
+  }
+  .toggle .slider:before {
+    content: ""; position: absolute;
+    height: 22px; width: 22px; left: 3px; bottom: 3px;
+    background: #888; border-radius: 50%; transition: 0.3s;
+  }
+  .toggle input:checked + .slider { background: #3fb950; }
+  .toggle input:checked + .slider:before { transform: translateX(24px); background: #fff; }
+
+  .port-row {
+    display: flex; align-items: center; gap: 10px; margin-top: 12px;
+  }
+  .port-row label {
+    font-size: 13px; color: #888;
+  }
+  .port-row input {
+    width: 100px; background: #0f1a30; border: 1px solid #334;
+    border-radius: 8px; padding: 8px 10px; color: #fff;
+    font-size: 15px; font-weight: 600; outline: none;
+    text-align: center; font-family: monospace;
+  }
+  .port-row input:focus { border-color: #5577bb; }
+
+  .btn {
+    width: 100%; padding: 14px; color: #fff;
+    border: none; border-radius: 12px; font-size: 15px;
+    font-weight: 500; cursor: pointer; margin-top: 8px;
+  }
+  .btn-save { background: #4466aa; }
+  .btn-save:active { background: #335588; }
+  .btn-apply { background: #2a6a2a; }
+  .btn-apply:active { background: #1a5a1a; }
+
+  .status-msg {
+    text-align: center; font-size: 13px;
+    color: #888; margin-top: 12px; min-height: 20px;
+  }
+
+  .info {
+    font-size: 12px; color: #666; line-height: 1.6; margin-top: 8px;
+  }
+
+  .warn-card {
+    background: #2a2a1a; border: 1px solid #554422; border-radius: 12px;
+    padding: 14px; margin-bottom: 12px;
+  }
+  .warn-card h2 { color: #d29922; }
+  .warn-card .info { color: #aa8844; }
+
+  .settings-toggle {
+    width: 100%; padding: 14px; background: #1a2a4a; color: #ccd;
+    border: 1px solid #334477; border-radius: 12px; font-size: 15px;
+    font-weight: 600; cursor: pointer; margin-top: 16px; text-align: center;
+  }
+  .settings-toggle:active { background: #16213e; }
+  .settings-panel {
+    display: none; background: #16213e; border: 1px solid #334477;
+    border-top: none; border-radius: 0 0 12px 12px; padding: 16px;
+    margin-top: -4px;
+  }
+  .settings-panel.open { display: block; }
+  .setting-group { margin-bottom: 16px; }
+  .setting-group:last-child { margin-bottom: 0; }
+  .setting-group h3 {
+    font-size: 13px; color: #8899bb; margin-bottom: 8px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .setting-row {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+  }
+  .setting-row input[type="checkbox"] {
+    width: 18px; height: 18px; accent-color: #4466aa;
+  }
+  .setting-row label { font-size: 13px; color: #ccc; cursor: pointer; }
+  .setting-info { font-size: 12px; color: #888; line-height: 1.6; }
+  .setting-warn { font-size: 11px; color: #888; margin-top: 8px; }
+
+  .dbg-section {
+    background: #0d1117; border: 1px solid #30363d; border-radius: 8px;
+    margin: 10px 0; padding: 12px; font-family: monospace;
+    font-size: 13px; line-height: 1.6; color: #c9d1d9;
+    word-break: break-all; white-space: pre-wrap;
+  }
+  .dbg-section h3 {
+    font-size: 13px; color: #58a6ff; margin: 0 0 8px 0;
+    padding-bottom: 6px; border-bottom: 1px solid #21262d;
+    font-family: -apple-system, system-ui, sans-serif;
+  }
+  .dbg-ok { color: #3fb950; }
+  .dbg-warn { color: #d29922; }
+  .dbg-dim { color: #6e7681; }
+  .dbg-key { color: #79c0ff; }
+</style>
 </head>
 <body>
-<a class="skip" href="#workspace">跳转到连接管理</a>
-<div class="shell">
-<header class="topbar">
-  <div class="brand"><span class="brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m8 7-5 5 5 5m8-10 5 5-5 5m-2-14-4 18"/></svg></span><div><strong>无线 ADB</strong><span class="brand-caption">稳定连接 · 本机管理</span></div></div>
-  <button id="refresh" class="icon-button" aria-label="刷新连接状态"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5m-4-4a8 8 0 0 1 13-3l2 2M4 17l2 2a8 8 0 0 0 13-3"/></svg></button>
-</header>
-<main id="workspace" aria-busy="true">
-  <div class="page-heading"><p class="eyebrow">连接控制台</p><h1>调试连接，由你掌控。</h1><p>用时开启，手动关闭。连接期间不设空闲超时。</p></div>
-  <div class="layout">
-    <section class="connection-panel" aria-labelledby="connection-title">
-      <div id="status-card" class="status-card" data-active="false">
-        <div class="section-line"><h2 id="connection-title">当前连接</h2><span class="badge" id="mode-label">等待读取</span></div>
-        <div class="connection-visual" aria-hidden="true"><svg viewBox="0 0 80 80"><rect x="26" y="15" width="28" height="50" rx="7"/><path d="M35 21h10M37 58h6M16 29a18 18 0 0 0 0 23m48-23a18 18 0 0 1 0 23M10 23a28 28 0 0 0 0 35m60-35a28 28 0 0 1 0 35"/></svg></div>
-        <div class="connection-state"><span class="status-dot" aria-hidden="true"></span><h3 id="state-label">正在读取状态</h3></div>
-        <p id="state-description" class="state-description">请从 root 管理器的模块页面打开。</p>
-        <dl class="connection-meta"><div><dt>Wi-Fi 地址</dt><dd id="ip-value">—</dd></div><div><dt>监听端口</dt><dd id="port-value">—</dd></div></dl>
-        <div class="command-label">在电脑终端执行</div>
-        <div class="command-box"><code id="connect-command">连接就绪后显示命令</code><button id="copy" class="icon-button" disabled aria-label="复制 ADB 连接命令"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg></button></div>
-        <p class="fine-print">首次连接需解锁手机并确认授权；TLS 模式请先配对。</p>
-      </div>
-      <section class="panel assurance" aria-labelledby="security-title"><div class="section-line"><h2 id="security-title">连接保障</h2><span class="small-label">不修改授权密钥</span></div><div class="assurance-row"><span class="check" aria-hidden="true">✓</span><span id="auth-value">等待检查授权属性</span></div><div class="assurance-row"><span class="check" aria-hidden="true">✓</span><span>无常驻自检 · 仅在打开时读取状态</span></div><p class="fine-print">授权属性检查不等于握手实测。root / ADB 状态仍可能被其他 App 检测，不承诺环境隐藏。</p></section>
-    </section>
-    <section class="panel settings-panel" aria-labelledby="settings-title">
-      <div class="section-line"><h2 id="settings-title">连接设置</h2><span class="small-label">本地保存</span></div>
-      <form id="config-form">
-        <div class="setting toggle-setting"><label for="enabled"><strong>启用无线 ADB</strong><span>开启后持续可用，不设空闲自动关闭</span></label><input id="enabled" type="checkbox" role="switch"></div>
-        <div class="setting"><label for="mode">连接模式</label><select id="mode" aria-describedby="mode-help"><option value="tcp">固定端口 · 传统 TCP</option><option value="tls">加密连接 · 原生 TLS</option></select><p id="mode-help" class="help"></p></div>
-        <div class="setting"><label for="port">固定端口</label><input id="port" type="text" inputmode="numeric" maxlength="5" pattern="[1-9][0-9]{3,4}" value="5555" aria-describedby="port-help" required><p id="port-help" class="help">1024–65535。TLS 使用系统动态端口。切换模式或端口会短暂断开。</p></div>
-        <div class="setting toggle-setting"><label for="notify"><strong>通知栏管理入口</strong><span id="notify-help">点击打开本页；通知不展示 IP 地址</span></label><input id="notify" type="checkbox" role="switch" checked></div>
-        <button class="primary" id="apply" type="submit">保存并应用</button>
-      </form>
-      <button class="danger subtle" id="pause">关闭远程连接</button>
-    </section>
+
+<h1>无线 ADB</h1>
+<p class="subtitle">持久无线调试 — 开机自动启用</p>
+
+<div class="card">
+  <h2>状态</h2>
+  <div class="status-display">
+    <span class="status-dot" id="status-dot"></span>
+    <span class="status-text" id="status-text">正在检查…</span>
   </div>
-  <section class="panel tools" aria-labelledby="tools-title"><div><h2 id="tools-title">配对与排障</h2><p class="help">授权与设备移除交由系统管理，不另外保存密钥。</p></div><div class="tool-actions"><button id="pair" class="secondary">系统配对与授权</button><button id="doctor" class="secondary">查看诊断</button></div></section>
-  <section id="diagnostics" class="panel" hidden><h2>本机诊断</h2><pre id="diagnostic-text"></pre></section>
-  <p id="message" class="message" role="status" aria-live="polite" aria-atomic="true">正在连接模块…</p>
-  <footer><span>无线 ADB · v2.0 测试版</span><span id="updated">尚未同步</span></footer>
-</main>
+  <div class="connect-info" id="connect-info" style="display:none" onclick="copyConnect()">
+    <span id="connect-addr">-</span>
+  </div>
+  <div class="connect-hint" id="connect-hint" style="display:none">点击复制。连接命令：adb connect &lt;地址&gt;</div>
 </div>
+
+<div class="card">
+  <div class="toggle-row">
+    <span class="toggle-label">开机启用</span>
+    <label class="toggle">
+      <input type="checkbox" id="enabled-toggle" checked>
+      <span class="slider"></span>
+    </label>
+  </div>
+  <div class="port-row">
+    <label>端口：</label>
+    <input type="number" id="port-input" value="5555" min="1024" max="65535">
+  </div>
+</div>
+
+<div class="warn-card">
+  <h2>安全提示</h2>
+  <div class="info">
+    无线 ADB 会向能够连接的设备开放调试访问。请仅在可信网络中使用，切勿在公共 Wi-Fi 下启用。
+  </div>
+</div>
+
+<button class="btn btn-save" onclick="saveConfig()">保存配置</button>
+<button class="btn btn-apply" onclick="applyNow()">立即应用（无需重启）</button>
+
+<button class="settings-toggle" onclick="toggleSettings()">设置</button>
+<div class="settings-panel" id="settings-panel">
+  <div class="setting-group">
+    <h3>高级设置</h3>
+    <div class="setting-row">
+      <input type="checkbox" id="debug-toggle">
+      <label for="debug-toggle">启用调试菜单</label>
+    </div>
+  </div>
+  <div class="setting-warn">
+    点击<b>保存配置</b>以保存设置更改。
+  </div>
+</div>
+
+<button class="btn" id="debug-btn" style="display:none;background:#333;margin-top:8px;font-size:13px" onclick="showDebug()">显示调试信息</button>
+<p class="status-msg" id="status-msg"></p>
+<div id="debug-out" style="display:none"></div>
+
+<script>
+var CONFIG_PATH = '/data/adb/wadb_config';
+var LOGFILE = '/data/adb/modules/wireless-adb/debug.log';
+
+function exec(cmd) {
+  var apis = [
+    { name: 'ksu', obj: typeof ksu !== 'undefined' ? ksu : null },
+    { name: 'ksuwebui', obj: typeof ksuwebui !== 'undefined' ? ksuwebui : null }
+  ];
+  for (var a = 0; a < apis.length; a++) {
+    if (!apis[a].obj) continue;
+    try {
+      var r = apis[a].obj.exec(cmd);
+      if (typeof r === 'string') return r;
+      if (typeof r === 'object' && r !== null) return r.stdout || r.out || '';
+      return String(r);
+    } catch(e) {}
+  }
+  return '';
+}
+
+function loadConfig() {
+  var config = exec("cat " + CONFIG_PATH + " 2>/dev/null").trim();
+  if (config) {
+    var enabledMatch = config.match(/enabled=(\w+)/);
+    var portMatch = config.match(/port=(\d+)/);
+    if (enabledMatch) document.getElementById('enabled-toggle').checked = (enabledMatch[1] === 'on');
+    if (portMatch) document.getElementById('port-input').value = portMatch[1];
+  }
+
+  // Load debug toggle
+  var debugMatch = config.match(/debug_menu=(\w+)/);
+  if (debugMatch && debugMatch[1] === 'on') {
+    document.getElementById('debug-toggle').checked = true;
+    document.getElementById('debug-btn').style.display = 'block';
+  }
+
+  updateStatus();
+}
+
+function updateStatus() {
+  var tcpPort = exec("getprop service.adb.tcp.port").trim();
+  var ip = exec("ip route get 1.1.1.1 2>/dev/null | grep -o 'src [0-9.]*' | cut -d' ' -f2").trim();
+  var dot = document.getElementById('status-dot');
+  var text = document.getElementById('status-text');
+  var info = document.getElementById('connect-info');
+  var hint = document.getElementById('connect-hint');
+  var addr = document.getElementById('connect-addr');
+
+  if (tcpPort && tcpPort !== '-1' && tcpPort !== '0' && ip) {
+    dot.className = 'status-dot on';
+    text.textContent = '已启用，端口：' + tcpPort;
+    addr.textContent = 'adb connect ' + ip + ':' + tcpPort;
+    info.style.display = 'block';
+    hint.style.display = 'block';
+  } else if (tcpPort && tcpPort !== '-1' && tcpPort !== '0') {
+    dot.className = 'status-dot on';
+    text.textContent = '已启用，端口：' + tcpPort;
+    addr.textContent = '未连接 Wi-Fi';
+    info.style.display = 'block';
+    hint.style.display = 'none';
+  } else {
+    dot.className = 'status-dot off';
+    text.textContent = '已禁用';
+    info.style.display = 'none';
+    hint.style.display = 'none';
+  }
+}
+
+function copyConnect() {
+  var text = document.getElementById('connect-addr').textContent;
+  if (text && text.indexOf('adb') !== -1) {
+    exec("echo '" + text + "' | am broadcast -a clipper.set 2>/dev/null");
+    document.getElementById('status-msg').textContent = '已复制到剪贴板';
+    setTimeout(function() { document.getElementById('status-msg').textContent = ''; }, 2000);
+  }
+}
+
+function saveConfig() {
+  var enabled = document.getElementById('enabled-toggle').checked ? 'on' : 'off';
+  var port = document.getElementById('port-input').value.trim() || '5555';
+  var debugOn = document.getElementById('debug-toggle').checked;
+
+  document.getElementById('debug-btn').style.display = debugOn ? 'block' : 'none';
+  if (!debugOn) document.getElementById('debug-out').style.display = 'none';
+
+  exec("echo 'enabled=" + enabled + "\\nport=" + port + "\\ndebug_menu=" + (debugOn ? 'on' : 'off') + "' > " + CONFIG_PATH);
+  document.getElementById('status-msg').textContent = '配置已保存，重启后生效。';
+}
+
+function applyNow() {
+  var enabled = document.getElementById('enabled-toggle').checked;
+  var port = document.getElementById('port-input').value.trim() || '5555';
+
+  // Save config first
+  saveConfig();
+
+  if (enabled) {
+    exec("setprop service.adb.tcp.port " + port + " && stop adbd && start adbd");
+    document.getElementById('status-msg').textContent = '无线 ADB 已启用，端口：' + port;
+  } else {
+    exec("setprop service.adb.tcp.port -1 && stop adbd && start adbd");
+    document.getElementById('status-msg').textContent = '无线 ADB 已禁用';
+  }
+
+  // Refresh status after a moment
+  setTimeout(updateStatus, 1000);
+}
+
+function toggleSettings() {
+  var panel = document.getElementById('settings-panel');
+  panel.className = panel.className.indexOf('open') !== -1 ? 'settings-panel' : 'settings-panel open';
+}
+
+function showDebug() {
+  var el = document.getElementById('debug-out');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  if (el.style.display === 'none') return;
+
+  var html = '';
+
+  var s1 = '';
+  var tcpPort = exec("getprop service.adb.tcp.port").trim() || '(not set)';
+  var tlsPort = exec("getprop service.adb.tls.port").trim() || '(not set)';
+  var adbEnabled = exec("settings get global adb_wifi_enabled 2>/dev/null").trim() || '(not set)';
+  var ip = exec("ip route get 1.1.1.1 2>/dev/null | grep -o 'src [0-9.]*' | cut -d' ' -f2").trim() || '(no wifi)';
+  var usbDebug = exec("settings get global adb_enabled 2>/dev/null").trim() || '?';
+  s1 += '<span class="dbg-key">service.adb.tcp.port</span>  <span class="' + (tcpPort !== '-1' && tcpPort !== '(not set)' ? 'dbg-ok' : 'dbg-dim') + '">' + tcpPort + '</span>\n';
+  s1 += '<span class="dbg-key">service.adb.tls.port</span>  <span class="dbg-dim">' + tlsPort + '</span>\n';
+  s1 += '<span class="dbg-key">adb_wifi_enabled</span>  <span class="dbg-dim">' + adbEnabled + '</span>\n';
+  s1 += '<span class="dbg-key">adb_enabled (USB)</span>  <span class="dbg-dim">' + usbDebug + '</span>\n';
+  s1 += '<span class="dbg-key">设备 IP</span>  <span class="dbg-ok">' + ip + '</span>\n';
+  html += '<div class="dbg-section"><h3>ADB 属性</h3>' + s1 + '</div>';
+
+  var s2 = '';
+  var config = exec("cat " + CONFIG_PATH + " 2>/dev/null").trim() || '(not set)';
+  var bootLog = exec("cat " + LOGFILE + " 2>/dev/null | tr '\\n' ' '").trim() || '(no log)';
+  s2 += '<span class="dbg-key">配置</span>  ' + config.replace(/\n/g, ', ') + '\n';
+  s2 += '<span class="dbg-key">启动日志</span>  ' + bootLog + '\n';
+  html += '<div class="dbg-section"><h3>配置</h3>' + s2 + '</div>';
+
+  el.innerHTML = '<div style="margin-top:12px"><div style="text-align:center;color:#58a6ff;font-size:14px;font-weight:600;margin-bottom:8px">v1.0</div>' + html + '</div>';
+
+  // Write debug to file
+  exec("echo '=== Wireless ADB Debug ===\\nDate: " + new Date().toString() + "\\ntcp_port=" + tcpPort + "\\ntls_port=" + tlsPort + "\\nadb_wifi=" + adbEnabled + "\\nip=" + ip + "\\nconfig=" + config.replace(/\n/g, ',') + "' > " + LOGFILE);
+}
+
+loadConfig();
+</script>
 </body>
 </html>
